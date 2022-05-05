@@ -342,7 +342,7 @@ background-color: rgb(84,153,199);
 </string>
             </property>
             <property name="text">
-             <string>Thoát</string>
+             <string>Tắt máy</string>
             </property>
            </widget>
           </item>

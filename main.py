@@ -290,7 +290,15 @@ class Main(QMainWindow):
         self.stackedWidget.setCurrentIndex(2)
     
     def goClose(self):
-        
+        newMessBox = QMessageBox(self)
+        newMessBox.setIcon(QMessageBox.Warning)
+        newMessBox.setText("Bạn có chắc chắn muốn thoát phần mềm và tắt máy?")
+        newMessBox.setWindowTitle("Thông báo")
+        newMessBox.setStandardButtons(QMessageBox.Yes|QMessageBox.No)
+        returnValue = newMessBox.exec()
+        if returnValue == QMessageBox.No:
+            return
+        # db_close()
         self.close()
     
     def searchData(self):
@@ -549,7 +557,10 @@ class Main(QMainWindow):
         self.timer.stop()
         self.initSensor.stop()
         db_close()
+        
+        
         print('close app!')
+        os.system('sudo shutdown -h now')
         
     
 
