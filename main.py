@@ -1,4 +1,5 @@
 import os
+import subprocess
 # import assets_qrc
 # from random import randint
 from PyQt5.QtWidgets import QFileDialog, QMainWindow,QApplication,QTableWidgetItem,QMessageBox,QHeaderView
@@ -560,7 +561,7 @@ class Main(QMainWindow):
         
         
         print('close app!')
-        os.system('sudo shutdown -h now')
+        subprocess.Popen('sudo shutdown -h now',shell=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE, stdin=subprocess.PIPE)
         
     
 
