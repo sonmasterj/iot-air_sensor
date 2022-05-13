@@ -117,8 +117,9 @@ class sensorThread(QThread):
                 self.msleep(10)
     def stop(self):
         self.threadActive = False
-        self.terminate()
-        self.wait()
+        self.quit()
+        # self.terminate()
+        # self.wait()
 
 class internetThread(QThread):
     updateStatus = pyqtSignal(int)
@@ -138,8 +139,9 @@ class internetThread(QThread):
                 self.msleep(10)
     def stop(self):
         self.threadActive = False
-        self.terminate()
-        self.wait()
+        # self.terminate()
+        # self.wait()
+        self.quit()
 
 class checkThread(QThread):
     updateStatus = pyqtSignal(object)
@@ -167,8 +169,9 @@ class checkThread(QThread):
                 self.msleep(10)
     def stop(self):
         self.threadActive = False
-        self.terminate()
-        self.wait()
+        # self.terminate()
+        # self.wait()
+        self.quit()
 
 
 class Main(QMainWindow):
@@ -300,6 +303,9 @@ class Main(QMainWindow):
         if returnValue == QMessageBox.No:
             return
         # db_close()
+        self.timer.stop()
+        self.initSensor.stop()
+        db_close()
         self.close()
     
     def searchData(self):
@@ -555,9 +561,7 @@ class Main(QMainWindow):
         self.readSensor.stop()
         self.readStatus.stop()
         self.readInternet.stop()
-        self.timer.stop()
-        self.initSensor.stop()
-        db_close()
+        
         
         
         print('close app!')

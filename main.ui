@@ -549,7 +549,7 @@ background-color: rgb(84,153,199);
 }</string>
                 </property>
                 <property name="text">
-                 <string>Cảm biến SO2 (ppml)</string>
+                 <string>Cảm biến SO2 (ppm)</string>
                 </property>
                 <property name="alignment">
                  <set>Qt::AlignCenter</set>
