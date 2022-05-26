@@ -25,11 +25,12 @@ curren_path = os.path.join(application_path,os.pardir)
 CHECK_INTERVAL = 1500
 INTERNET_INTERVAL = 4000
 SENSOR_INTERVAL = 3000
+INIT_SENSOR = 1*60*1000
 SO2_ADDRESS = 0x74
 NO2_ADDRESS = 0x75
 CO_ADDRESS = 0x76
 TOKEN = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpZCI6ImRmYXNkZjMyIiwicm9sZSI6MSwiaWF0IjoxNjUzMzU4MjUyfQ.JG8L-1-jzIZA03OuOTKsi7EIsU_tKVe7y9WCD0xzAJw"
-SERVER_URL="http://192.168.1.140:8000/calib"
+SERVER_URL="http://aiot-jsc.ddns.net:8000/calib"
 #set up i2c 
 
 def convertTime(time):
@@ -147,7 +148,7 @@ class internetThread(QThread):
                 else:
                     self.updateStatus.emit({'internet_status':internet_status,'status':401})
             else:
-                self.updateStatus.emit({'internet_status':internet_status})
+                self.updateStatus.emit({'internet_status':internet_status,'status':401})
             i=0
             while i<self.steps and self.threadActive == True:
                 i=i+1
@@ -278,7 +279,7 @@ class Main(QMainWindow):
         #set up timer for heating sensor
         self.initSensor=QTimer()
         self.initSensor.timeout.connect(self.stopInit)
-        self.initSensor.start(1*20*1000)
+        self.initSensor.start(INIT_SENSOR)
 
         #set up thread internet
         self.readInternet = internetThread(self)

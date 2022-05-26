@@ -434,9 +434,9 @@ class DFRobot_MultiGasSensor(object):
       @brief Get sensor onboard temperature
       @return Board temperature, unit °C
     '''
-    Rth=-1
+    Rth=0
     Tbeta=0
-    while Rth<0:
+    while Rth<=0:
     # clear_buffer(recvbuf,9)
       sendbuf = [0]*9
       sendbuf[0]=0xff
@@ -454,10 +454,9 @@ class DFRobot_MultiGasSensor(object):
       temp_ADC=(recvbuf[2]<<8)+recvbuf[3]
       Vpd3=float(temp_ADC/1024.0)*3
       Rth = Vpd3*10000/(3-Vpd3)
-      if Rth<0:
-        continue
-      Tbeta = 1/(1/(273.15+25)+1/3380.13*(math.log(Rth/10000)))-273.15
-      break
+      if Rth>0:
+        Tbeta = 1/(1/(273.15+25)+1/3380.13*(math.log(Rth/10000)))-273.15
+        break
     return Tbeta
     
   def set_temp_compensation(self,tempswitch):
