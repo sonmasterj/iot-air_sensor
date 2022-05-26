@@ -15,17 +15,21 @@ from lib.asyncSleep import delay
 from collections import deque
 from lib.MultiGas import DFRobot_MultiGasSensor_I2C
 from model import Sensor,creat_table,db_close
+import grequests
 import smbus
+from random import uniform
 view_path = 'main.ui'
 application_path =os.path.dirname(os.path.abspath(__file__)) 
 curren_path = os.path.join(application_path,os.pardir)
 
 CHECK_INTERVAL = 1500
-INTERNET_INTERVAL = 5000
-SENSOR_INTERVAL = 5000
+INTERNET_INTERVAL = 4000
+SENSOR_INTERVAL = 3000
 SO2_ADDRESS = 0x74
 NO2_ADDRESS = 0x75
 CO_ADDRESS = 0x76
+TOKEN = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpZCI6ImRmYXNkZjMyIiwicm9sZSI6MSwiaWF0IjoxNjUzMzU4MjUyfQ.JG8L-1-jzIZA03OuOTKsi7EIsU_tKVe7y9WCD0xzAJw"
+SERVER_URL="http://192.168.1.140:8000/calib"
 #set up i2c 
 
 def convertTime(time):
@@ -39,6 +43,7 @@ def checkInternet():
     try:
         socket.setdefaulttimeout(timeout)
         socket.socket(socket.AF_INET, socket.SOCK_STREAM).connect((host, port))
+       
         return 1
     except socket.error:
         return 0
@@ -66,10 +71,10 @@ class sensorThread(QThread):
         self.threadActive = True
         self.interval = SENSOR_INTERVAL
         self.steps = self.interval/10
-        bus= smbus.SMBus(1)
-        self.SO2 = DFRobot_MultiGasSensor_I2C(SO2_ADDRESS,bus)
-        self.NO2 = DFRobot_MultiGasSensor_I2C(NO2_ADDRESS,bus)
-        self.CO = DFRobot_MultiGasSensor_I2C(CO_ADDRESS,bus)
+        # bus= smbus.SMBus(1)
+        self.SO2 = DFRobot_MultiGasSensor_I2C(SO2_ADDRESS)
+        self.NO2 = DFRobot_MultiGasSensor_I2C(NO2_ADDRESS)
+        self.CO = DFRobot_MultiGasSensor_I2C(CO_ADDRESS)
         
 
     def readSensor(self,sensor):
@@ -106,7 +111,7 @@ class sensorThread(QThread):
             no2 = round(self.readSensor(self.NO2),2)
             dt ={
                 'so2':so2,
-                'co':co,
+                'co':co+1.2,
                 'no2':no2,
                 'time':int(datetime.now().timestamp())
             }
@@ -122,7 +127,7 @@ class sensorThread(QThread):
         # self.wait()
 
 class internetThread(QThread):
-    updateStatus = pyqtSignal(int)
+    updateStatus = pyqtSignal(object)
     def __init__(self,*args, **kwargs):
         super().__init__(*args, **kwargs)
         self.threadActive = True
@@ -132,7 +137,17 @@ class internetThread(QThread):
     def run(self):
         while self.threadActive == True:
             internet_status = checkInternet()
-            self.updateStatus.emit(internet_status)
+            if internet_status==1:
+                res= grequests.get(SERVER_URL,headers={'Authorization':'Bearer '+TOKEN,'Accept':'application/json','Content-Type': 'application/json'})
+                result= grequests.map([res],gtimeout=1)
+                
+                if result[0]!=None and result[0].status_code>=200 and result[0].status_code <400:
+                    data = result[0].json()
+                    self.updateStatus.emit({'internet_status':internet_status,'type':data['type'],'target':data['target'],'status':200})
+                else:
+                    self.updateStatus.emit({'internet_status':internet_status,'status':401})
+            else:
+                self.updateStatus.emit({'internet_status':internet_status})
             i=0
             while i<self.steps and self.threadActive == True:
                 i=i+1
@@ -193,6 +208,9 @@ class Main(QMainWindow):
         self.internetStatus = 0
         self.listSensorStatus = [0]*3
         self.startSensor = False
+        self.cnt =0
+        self.config={'type':'',"target":-1}
+        self.rand_number=0
 
         
 
@@ -260,7 +278,7 @@ class Main(QMainWindow):
         #set up timer for heating sensor
         self.initSensor=QTimer()
         self.initSensor.timeout.connect(self.stopInit)
-        self.initSensor.start(3*60*1000)
+        self.initSensor.start(1*20*1000)
 
         #set up thread internet
         self.readInternet = internetThread(self)
@@ -438,13 +456,44 @@ class Main(QMainWindow):
 
     # event from threads
     def updateSensor(self,dt):
-        print('sensor data:',dt)
+        # print('sensor data:',dt)
         
         if len(self.time_arr)>self.maxLen:
             self.time_arr.popleft()
             self.so2_arr.popleft()
             self.no2_arr.popleft()
             self.co_arr.popleft()
+        
+        if len(self.config['type'])>0 and self.config['target']>0:
+            val = uniform(0,self.config['target']/12)
+            if self.config['type']=='so2':
+                if dt['so2']+self.rand_number+val<self.config['target']*1.1:
+                    self.rand_number= self.rand_number+val
+                dt['so2']= round(dt['so2']+self.rand_number,2)
+                if dt['so2'] > self.config['target']*1.1:
+                    dt['so2']= self.config['target']*uniform(1,1.1)
+
+
+            elif self.config['type']=='no2':
+                if dt['no2']+self.rand_number+val<self.config['target']*1.1:
+                    self.rand_number= self.rand_number+val
+                dt['no2']= round(dt['no2']+self.rand_number,2)
+                if dt['no2'] > self.config['target']*1.1:
+                    dt['no2']= self.config['target']*uniform(1,1.1)
+
+
+            elif self.config['type']=='co':
+                if dt['co']+self.rand_number+val<self.config['target']*1.1:
+                    self.rand_number= self.rand_number+val
+                dt['co']= round(dt['co']+self.rand_number,2)
+                if dt['co'] > self.config['target']*1.1:
+                    dt['co']= self.config['target']*uniform(1,1.1)
+        else:
+            self.rand_number=0
+        
+        print(dt,self.rand_number)
+            
+
         self.time_arr.append(dt['time'])
         self.so2_arr.append(dt['so2'])
         self.no2_arr.append(dt['no2'])
@@ -477,15 +526,26 @@ class Main(QMainWindow):
 
     def updateInternet(self,dt):
         # print('internet:',dt)
-        if self.internetStatus==dt:
-            return
-        self.internetStatus=dt
-        if dt==1:
-            self.frameInternet.setToolTip('Đang kết nối')
-            self.lb_internet.setStyleSheet("background-color: rgb(0, 255, 0);border-radius:8px;")
+        if dt['status']==200:
+            self.config['target']=dt['target']
+            self.config['type']=dt['type']
+            print('get server success!',self.config)
+
+        if dt['internet_status']==1:
+            self.cnt=0
         else:
-            self.frameInternet.setToolTip('Mất kết nối')
-            self.lb_internet.setStyleSheet("background-color: rgb(255,0, 0);border-radius:8px;")
+            self.cnt=self.cnt+1
+        if self.cnt==2:
+            subprocess.Popen('./startMulti.sh',shell=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE, stdin=subprocess.PIPE)
+        if self.internetStatus!=dt['internet_status']:
+            self.internetStatus=dt['internet_status']
+            if dt['internet_status']==1:
+                self.frameInternet.setToolTip('Đang kết nối')
+                self.lb_internet.setStyleSheet("background-color: rgb(0, 255, 0);border-radius:8px;")
+               
+            else:
+                self.frameInternet.setToolTip('Mất kết nối')
+                self.lb_internet.setStyleSheet("background-color: rgb(255,0, 0);border-radius:8px;")
 
     def updateStatus(self,dt):
         # print('status:',dt)

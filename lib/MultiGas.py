@@ -10,19 +10,20 @@
   @url https://github.com/DFRobot/DFRobot_MultiGasSensor
 """
 import time
-# import smbus
+import smbus
 # import os
 import math
 from lib.asyncSleep import delay
 # import RPi.GPIO as GPIO
 I2C_MODE  = 0x01
+UART_MODE = 0x02
 
 # sendbuf = [0]*9  
 # recvbuf = [0]*9
 tempSwitch = 0
 temp = 0.0
-# bus=smbus.SMBus(1)
-# time.sleep(0.1)
+bus=smbus.SMBus(1)
+delay(0.1)
 def fuc_check_sum(i,ln):
   '''!
     @brief CRC check function
@@ -67,7 +68,7 @@ class DFRobot_MultiGasSensor(object):
   gastype       =    ""  
   temp          =    0.0
   
-  def __init__(self ,bus):
+  def __init__(self ,Baud):
     
     self.i2cbus = bus
       # self.__uart_i2c = I2C_MODE
@@ -75,6 +76,123 @@ class DFRobot_MultiGasSensor(object):
   # def __getitem__(self, k):
   #   if k == recvbuf:
   #     return recvbuf
+
+  def analysis_all_data(self,recv):
+    '''!
+      @brief   The obtained data list by parsing.
+      @param recv The obtained data
+    '''    
+    #recv[5]Indicate resolution, 0 indicate resolution is 1, 1 indicate resolution is 0.1, 2 indicate resolution is 0.01
+    if(recv[5]==0):
+      self.gasconcentration = (recv[2] << 8) + recv[3]
+    elif(recv[5]==1):
+      self.gasconcentration = 0.1*((recv[2] << 8) + recv[3])
+    elif(recv[5]==2):
+      self.gasconcentration = 0.01*((recv[2] << 8) + recv[3]) 
+    #recv[4]Indicate probe type
+    if recv[4]==0x05:
+      self.gastype = "O2"
+    elif recv[4]==0x04:
+      self.gastype = "CO"
+    elif recv[4]==0x03:
+      self.gastype = "H2S"
+    elif recv[4]==0x2C:
+      self.gastype = "NO2"
+    elif recv[4]==0x2A:
+      self.gastype = "O3"
+    elif recv[4]==0x31:
+      self.gastype = "CL2"
+    elif recv[4]==0x02:
+      self.gastype = "NH3"
+    elif recv[4]==0x06:
+      self.gastype = "H2"
+    elif recv[4]==0x33:
+      self.gastype = "HF"
+    elif recv[4]==0x45:
+      self.gastype = "PH3"
+    else:
+      self.gastype =""
+    Con = self.gasconcentration  
+    if (self.gastype == self.O2):
+      pass
+    elif (self.gastype == self.CO) :
+      if(((temp)>-20) and ((temp)<20)):
+        Con = (Con/(0.005*(temp)+0.9))
+      elif (((temp)>20) and ((temp)<40)):
+        Con = (Con/(0.005*(temp)+0.9)-(0.3*(temp)-6))
+      else:
+        Con = 0.0
+    elif (self.gastype == self.H2S):
+      if(((temp)>-20) and ((temp)<20)):
+        Con = (Con/(0.006*(temp)+0.92))
+      elif (((temp)>20) and ((temp)<40)):
+        Con = (Con/(0.006*(temp)+0.92)-(0.015*(temp)+2.4))
+      else :
+        Con = 0.0
+    elif (self.gastype == self.NO2):
+      if(((temp)>-20) and ((temp)<0)):
+        Con = ((Con/(0.005*(temp)+0.9)-(-0.0025*(temp))))
+      elif (((temp)>0) and ((temp)<20)):
+        Con = ((Con/(0.005*(temp)+0.9)-(0.005*(temp)+0.005)))
+      elif (((temp)>20) and ((temp)<40)):
+        Con = ((Con/(0.005*(temp)+0.9)-(0.0025*(temp)+0.1)))
+      else :
+        Con =   0.0
+    elif (self.gastype == self.O3):
+      if(((temp)>-20) and ((temp)<0)):
+        Con = ((Con/(0.015*(temp)+1.1)-0.05))
+      elif (((temp)>0) and ((temp)<20)):
+        Con = ((Con/1.1-(0.01*(temp))))
+      elif (((temp)>20) and ((temp)<40)):
+        Con = ((Con/1.1-(-0.05*(temp)+0.3)))
+      else :
+         Con = 0.0
+    elif (self.gastype == self.CL2):
+      if(((temp)>-20) and ((temp)<0)):
+        Con = ((Con/(0.015*(temp)+1.1)-(-0.0025*(temp))))
+      elif (((temp)>0) and ((temp)<20)):
+        Con = ((Con/1.1-0.005*(temp)))
+      elif (((temp)>20) and ((temp)<40)):
+        Con = ((Con/1.1-(0.06*(temp)-0.12)))
+      else:
+        Con = 0.0
+    elif (self.gastype ==self.NH3):
+      if(((temp)>-20) and ((temp)<0)):
+        Con = (Con/(0.08*(temp)+3.98)-(-0.005*(temp)+0.3))
+      elif (((temp)>0) and ((temp)<20)):
+        Con = (Con/(0.08*(temp)+3.98)-(-0.005*(temp)+0.3))
+      elif (((temp)>20) and ((temp)<40)):
+        Con = (Con/(0.004*(temp)+1.08)-(-0.1*(temp)+2))
+      else:
+        Con = 0.0
+    elif (self.gastype == self.H2):
+      if(((temp)>-20) and ((temp)<40)):
+        Con = (Con/(0.74*(temp)+0.007)-5)
+      else:
+        Con =   0.0
+    elif (self.gastype == self.HF):
+      if(((temp)>-20) and ((temp)<0)):
+        Con = (((Con/1)-(-0.0025*(temp))))
+      elif (((temp)>0) and ((temp)<20)):
+        Con = ((Con/1+0.1))
+      elif (((temp)>20) and ((temp)<40)):
+        Con = ((Con/1-(0.0375*(temp)-0.85)))
+      else :
+        Con = 0.0
+    elif (self.gastype == self.PH3):
+      if(((temp)>-20) and ((temp)<40)):
+        Con = ((Con/(0.005*(temp)+0.9)))
+    else:
+      Con = 0.0             
+    if(Con>0):
+      self.gasconcentration = Con
+    else:
+      self.gasconcentration = 0
+    temp_ADC=(recv[6]<<8)+recv[7] 
+    Vpd3=float(temp_ADC/1024.0)*3
+    Rth = Vpd3*10000/(3-Vpd3)
+    self.temp = 1/(1/(273.15+25)+1/3380.13*(math.log(Rth/10000)))-273.15     
+    
   def change_acquire_mode(self,mode):
     '''!
       @brief Change the mode of reporting data to the main controller after the sensor has collected the gas.
@@ -110,8 +228,6 @@ class DFRobot_MultiGasSensor(object):
       @brief Get the gas concentration or type obtained by the sensor
       @return if data is transmitted normally, return gas concentration; otherwise, return 0xffff
     '''  
-    global temp
-    global tempSwitch
     sendbuf = [0xff,0x01,0x86,0x00,0x00,0x00,0x00,0x00,0x79]
     if self.write_data(0,sendbuf,9) == False:
       return -1
@@ -226,7 +342,43 @@ class DFRobot_MultiGasSensor(object):
     if(Con<0):
       return 0
     else:
-      return Con         
+      return Con     
+
+  # def read_gas_type(self):
+  #   '''!
+  #     @brief Get the gas type obtained by the sensor
+  #     @return Gas type
+  #     @n  O2   0x05
+  #     @n  CO   0x04
+  #     @n  H2S  0x03
+  #     @n  NO2  0x2C
+  #     @n  O3   0x2A
+  #     @n  CL2  0x31
+  #     @n  NH3  0x02
+  #     @n  H2   0x06
+  #     @n  HCL  0X2E
+  #     @n  SO2  0X2B
+  #     @n  HF   0x33
+  #     @n  PH3  0x45
+  #   '''  
+  #   sendbuf = [0xff,0x01,0x86,0x00,0x00,0x00,0x00,0x00,0x79]
+  #   # sendbuf[0]=0xff
+  #   # sendbuf[1]=0x01
+  #   # sendbuf[2]=0x86
+  #   # sendbuf[3]=0x00
+  #   # sendbuf[4]=0x00
+  #   # sendbuf[5]=0x00
+  #   # sendbuf[6]=0x00
+  #   # sendbuf[7]=0x00
+  #   # sendbuf[8]=fuc_check_sum(sendbuf,8)
+  #   self.write_data(0,sendbuf,9)
+  #   delay(0.1)
+  #   recvbuf=self.read_data(0,9)
+  #   if(fuc_check_sum(recvbuf,8) == recvbuf[8]):
+  #     return (recvbuf[4])
+  #   else:
+  #     return 0xff   
+    
   def set_threshold_alarm(self,switchof,threshold,gasType):
     '''!
       @brief Set sensor alarm threshold
@@ -282,9 +434,10 @@ class DFRobot_MultiGasSensor(object):
       @brief Get sensor onboard temperature
       @return Board temperature, unit °C
     '''
+    Rth=-1
+    Tbeta=0
+    while Rth<0:
     # clear_buffer(recvbuf,9)
-    Rth=0
-    while Rth<=0: 
       sendbuf = [0]*9
       sendbuf[0]=0xff
       sendbuf[1]=0x01
@@ -301,9 +454,10 @@ class DFRobot_MultiGasSensor(object):
       temp_ADC=(recvbuf[2]<<8)+recvbuf[3]
       Vpd3=float(temp_ADC/1024.0)*3
       Rth = Vpd3*10000/(3-Vpd3)
-      delay(0.1)
-
-    Tbeta = 1/(1/(273.15+25)+1/3380.13*(math.log(Rth/10000)))-273.15  
+      if Rth<0:
+        continue
+      Tbeta = 1/(1/(273.15+25)+1/3380.13*(math.log(Rth/10000)))-273.15
+      break
     return Tbeta
     
   def set_temp_compensation(self,tempswitch):
@@ -314,8 +468,6 @@ class DFRobot_MultiGasSensor(object):
                    ON  Turn on temperature compensation
                    OFF Turn off temperature compensation
     '''  
-    global tempSwitch
-    global temp
     tempSwitch = tempswitch
     temp = self.read_temp()
     
@@ -373,9 +525,9 @@ class DFRobot_MultiGasSensor(object):
 
 class DFRobot_MultiGasSensor_I2C(DFRobot_MultiGasSensor):
 
-  def __init__(self  ,addr,bus):
+  def __init__(self  ,addr):
     self.__addr = addr
-    super(DFRobot_MultiGasSensor_I2C, self).__init__(bus)
+    super(DFRobot_MultiGasSensor_I2C, self).__init__(0)
 
   def data_is_available(self):
     '''
@@ -398,7 +550,7 @@ class DFRobot_MultiGasSensor_I2C(DFRobot_MultiGasSensor):
     sendbuf[8]=fuc_check_sum(sendbuf,8)
     self.write_data(0,sendbuf,9)
     delay(0.1)
-    data = self.read_data(0,9)  
+    data = self.read_data(0,recvbuf,9)  
     if (data[8] == fuc_check_sum(data, 8)):
       self.analysis_all_data(data)
       return True
@@ -419,7 +571,7 @@ class DFRobot_MultiGasSensor_I2C(DFRobot_MultiGasSensor):
         return True
       except Exception as ex:
         # print("please check connect address "+str(hex(self.__addr)),ex)
-        # time.sleep(1)
+        # delay(1)
         return False
 
   def read_data(self, reg ,length):
