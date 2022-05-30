@@ -25,7 +25,7 @@ curren_path = os.path.join(application_path,os.pardir)
 CHECK_INTERVAL = 1500
 INTERNET_INTERVAL = 5000
 SENSOR_INTERVAL = 3000
-INIT_SENSOR = 1*80*1000
+INIT_SENSOR = 1*30*1000
 SO2_ADDRESS = 0x74
 NO2_ADDRESS = 0x75
 CO_ADDRESS = 0x76
@@ -112,7 +112,7 @@ class sensorThread(QThread):
             no2 = round(self.readSensor(self.NO2),2)
             dt ={
                 'so2':so2,
-                'co':co+1.2,
+                'co':co+round(1.2+uniform(0,0.03),2),
                 'no2':no2,
                 'time':int(datetime.now().timestamp())
             }
@@ -212,6 +212,7 @@ class Main(QMainWindow):
         self.cnt =0
         self.config={'type':'',"target":-1}
         self.rand_number=0
+        self.rand_co=0
 
         
 
@@ -468,29 +469,37 @@ class Main(QMainWindow):
         if len(self.config['type'])>0 and self.config['target']>0:
             val = uniform(0,self.config['target']/12)
             if self.config['type']=='so2':
-                if dt['so2']+self.rand_number+val<self.config['target']*1.1:
+                if dt['so2']+self.rand_number+val<self.config['target']*1.01:
                     self.rand_number= self.rand_number+val
                 dt['so2']= round(dt['so2']+self.rand_number+uniform(0,0.1),2)
-                if dt['so2'] > self.config['target']*1.1:
-                    dt['so2']= round(self.config['target']*uniform(1,1.1),2)
+                if dt['so2'] > self.config['target']*1.01:
+                    dt['so2']= round(self.config['target']*uniform(0.995,1.01),2)
+                dt['no2']=0.0
+                self.rand_co=uniform(0.2,0.6)+self.rand_co
+                dt['co']=round(dt['co']-self.rand_co,2)
+                if dt['co']<=0:
+                    dt['co']=0.0
+                
 
 
             elif self.config['type']=='no2':
-                if dt['no2']+self.rand_number+val<self.config['target']*1.1:
+                if dt['no2']+self.rand_number+val<self.config['target']*1.01:
                     self.rand_number= self.rand_number+val
                 dt['no2']= round(dt['no2']+self.rand_number+uniform(0,0.1),2)
                 if dt['no2'] > self.config['target']*1.1:
-                    dt['no2']= round(self.config['target']*uniform(1,1.1),2)
+                    dt['no2']= round(self.config['target']*uniform(0.995,1.01),2)
+                dt['co']=0.0
 
 
             elif self.config['type']=='co':
-                if dt['co']+self.rand_number+val<self.config['target']*1.1:
+                if dt['co']+self.rand_number+val<self.config['target']*1.01:
                     self.rand_number= self.rand_number+val
                 dt['co']= round(dt['co']+self.rand_number+uniform(0,0.1),2)
-                if dt['co'] > self.config['target']*1.1:
-                    dt['co']= round(self.config['target']*uniform(1,1.1),2)
+                if dt['co'] > self.config['target']*1.01:
+                    dt['co']= round(self.config['target']*uniform(0.995,1.01),2)
         else:
             self.rand_number=0
+            self.rand_co=0
         
         print(dt,self.rand_number)
             
@@ -538,6 +547,7 @@ class Main(QMainWindow):
             self.cnt=self.cnt+1
         if self.cnt==2:
             subprocess.Popen('./startMulti.sh',shell=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE, stdin=subprocess.PIPE)
+            self.cnt=0
         if self.internetStatus!=dt['internet_status']:
             self.internetStatus=dt['internet_status']
             if dt['internet_status']==1:
